@@ -1,5 +1,7 @@
 # Dock Preview
 
+采用 [MIT License](LICENSE)。
+
 面向 macOS 27.0 和 Apple Silicon 的原生 Dock 窗口预览工具。Swift + AppKit，设置页使用 SwiftUI，无第三方依赖，无网络请求。
 
 ## 构建与运行
