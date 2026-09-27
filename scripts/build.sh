@@ -4,9 +4,10 @@ cd "${0:A:h:h}"
 export CLANG_MODULE_CACHE_PATH="${PWD}/.build/clang-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="${PWD}/.build/module-cache"
 swift build --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -c release --arch arm64
+preview_binary_directory="$(swift build --disable-sandbox --cache-path .build/cache --config-path .build/config --security-path .build/security -c release --arch arm64 --show-bin-path)"
 app="${PWD}/build/Dock Preview.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
-cp .build/arm64-apple-macosx/release/DockPreview "$app/Contents/MacOS/DockPreview"
+cp "$preview_binary_directory/DockPreview" "$app/Contents/MacOS/DockPreview"
 cp Resources/Info.plist "$app/Contents/Info.plist"
 cp -R Resources/en.lproj Resources/zh-Hans.lproj "$app/Contents/Resources/"
 xcrun swiftc -target arm64-apple-macosx27.0 -module-cache-path "$SWIFTPM_MODULECACHE_OVERRIDE" scripts/make-icon.swift -o .build/make-icon

@@ -157,3 +157,5 @@ Release 构建及签名校验通过，已安装并启动 0.1.10。用户指定�
 新增 main/PR/手动运行的测试、arm64 Release 与可视化 DMG 构建，上传 DMG、应用 ZIP 和 SHA-256 文件；匹配 Info.plist 版本的 v 标签在成功构建后发布 GitHub Release。使用官方 xcode-27 Apple Silicon macOS 27 runner，构建只读、仅标签发布拥有 contents 写权限，无证书 secrets。
 
 actionlint 与 diff 检查通过；官方 preview runner 标签尚未进入 actionlint 内置列表，通过配置声明。此次本机测试重跑受 Xcode 待接受许可证阻塞，备用 Command Line Tools 的 PackageDescription 不支持 swiftLanguageModes，因此不能代替当前 Xcode；未修改 SwiftPM 配置或代用户接受许可证。20 项测试此前在当前 Xcode 下通过；本次新增工作流的端到端结果以 GitHub Actions 实际运行记录为准。
+
+首次 hosted run 36330020197：平台检查与核心测试成功，Release 编译成功；打包复制因新 SwiftPM 的二进制输出路径变化失败。构建脚本改用同配置的 `swift build --show-bin-path`，不再假定 `.build/arm64-apple-macosx/release`。设置显式导入 Combine，处理新工具链的传递导入警告。shell 语法与 diff 检查通过，修复通过推送后 hosted run 验证。
