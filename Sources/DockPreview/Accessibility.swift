@@ -18,6 +18,7 @@ struct WindowRecord: Identifiable {
     let minimized: Bool
     let canClose: Bool
     var menuOnly = false
+    var captureWindowID: CGWindowID? = nil
     var descriptor: WindowDescriptor { .init(pid: pid, title: title, frame: frame) }
 }
 
@@ -187,6 +188,24 @@ final class AccessibilityService: @unchecked Sendable {
                                                 frame: .zero, minimized: mark == "◆", canClose: false, menuOnly: true))
                     fresh.append((entry, id))
                 }
+                if records.isEmpty, CGPreflightScreenCaptureAccess(),
+                   let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] {
+                    // Some applications (including System Settings) expose no AX
+                    // windows or Window menu outside their Space. Use explicit CG
+                    // IDs for previews, never invent an AX window operation target.
+                    for entry in info {
+                        guard (entry[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
+                              (entry[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                              let title = entry[kCGWindowName as String] as? String, !title.isEmpty,
+                              let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+                              let frame = CGRect(dictionaryRepresentation: bounds), frame.width > 40, frame.height > 40,
+                              let number = entry[kCGWindowNumber as String] as? NSNumber else { continue }
+                        let windowID = number.uint32Value
+                        let id = knownRecords[pid]?.first { $0.captureWindowID == windowID }?.id ?? UUID()
+                        records.append(WindowRecord(id: id, pid: pid, element: app, title: title, frame: frame,
+                                                    minimized: false, canClose: false, captureWindowID: windowID))
+                    }
+                }
                 identities[pid] = Array(fresh.prefix(256))
                 knownRecords[pid] = Array(records.prefix(256))
                 if identities.count > 8 {
@@ -194,6 +213,50 @@ final class AccessibilityService: @unchecked Sendable {
                 }
                 continuation.resume(returning: Array(records.prefix(256)))
             }
+        }
+    }
+
+    /// An empty filtered preview is not proof that an app has no windows.
+    /// Require a successful AX query and no window objects/menu items/CG windows.
+    func canOfferQuit(pid: pid_t) async -> Bool {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                let app = AXUIElementCreateApplication(pid)
+                AXUIElementSetMessagingTimeout(app, 0.2)
+                var value: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
+                      let windows = value as? [AXUIElement],
+                      !windows.contains(where: { (attribute($0, kAXRoleAttribute) as String?) == "AXWindow" }),
+                      windowMenuEntries(app).isEmpty,
+                      let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
+                    continuation.resume(returning: false); return
+                }
+                let hasWindow = info.contains { entry in
+                    guard (entry[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
+                          (entry[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                          let bounds = entry[kCGWindowBounds as String] as? [String: Any] else { return false }
+                    let width = (bounds["Width"] as? NSNumber)?.doubleValue ?? 0
+                    let height = (bounds["Height"] as? NSNumber)?.doubleValue ?? 0
+                    guard width > 40, height > 40 else { return false }
+                    let visible = (entry[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false
+                    let title = (entry[kCGWindowName as String] as? String) ?? ""
+                    // AppKit/WebKit can retain ordered-out internal windows with
+                    // large bounds. Bounds alone do not establish a user window.
+                    // Named off-Space windows still prevent the empty state.
+                    return visible || !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !CGPreflightScreenCaptureAccess()
+                }
+                continuation.resume(returning: !hasWindow)
+            }
+        }
+    }
+
+    func quitApplicationIfEmpty(pid: pid_t) async -> String? {
+        guard await canOfferQuit(pid: pid) else { return "应用已有窗口，或暂时无法确认窗口状态" }
+        guard await activateTarget(pid: pid) else { return "无法激活应用，请重试" }
+        guard await canOfferQuit(pid: pid) else { return "应用已有窗口，退出操作已取消" }
+        return await MainActor.run {
+            guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return nil }
+            return app.terminate() ? nil : "应用未接受退出请求"
         }
     }
 
@@ -241,6 +304,30 @@ final class AccessibilityService: @unchecked Sendable {
         return await withCheckedContinuation { continuation in
             queue.async { [self] in
                 AXUIElementSetMessagingTimeout(window.element, 0.25)
+                if window.captureWindowID != nil {
+                    guard !close else { continuation.resume(returning: "无法安全关闭此窗口"); return }
+                    let app = AXUIElementCreateApplication(window.pid)
+                    let elements: [AXUIElement] = attribute(app, kAXWindowsAttribute) ?? []
+                    let actual = elements.compactMap { element -> WindowRecord? in
+                        guard (attribute(element, kAXRoleAttribute) as String?) == "AXWindow", let frame = axFrame(element) else { return nil }
+                        return WindowRecord(id: window.id, pid: window.pid, element: element,
+                                            title: attribute(element, kAXTitleAttribute) ?? "", frame: frame,
+                                            minimized: attribute(element, kAXMinimizedAttribute) ?? false, canClose: false)
+                    }
+                    if let index = WindowMatcher.uniqueMatch(window.descriptor, candidates: actual.map(\.descriptor)) {
+                        let target = actual[index]
+                        if target.minimized {
+                            let error = AXUIElementSetAttributeValue(target.element, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                            guard error == .success else { continuation.resume(returning: operationError(error)); return }
+                        }
+                        finishRestore(target, attemptsRemaining: 10, continuation: continuation)
+                    } else if knownRecords[window.pid]?.count == 1 {
+                        finishCaptureActivation(window, attemptsRemaining: 15, continuation: continuation)
+                    } else {
+                        continuation.resume(returning: "应用已激活，但无法安全选择该窗口")
+                    }
+                    return
+                }
                 if window.menuOnly {
                     guard !close,
                           (attribute(window.element, kAXIdentifierAttribute) as String?) == "makeKeyAndOrderFront:",
@@ -268,6 +355,23 @@ final class AccessibilityService: @unchecked Sendable {
                 }
                 finishRestore(window, attemptsRemaining: 10, continuation: continuation)
             }
+        }
+    }
+
+    private func finishCaptureActivation(_ window: WindowRecord, attemptsRemaining: Int,
+                                         continuation: CheckedContinuation<String?, Never>) {
+        let visible = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        if visible.contains(where: {
+            ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == window.pid &&
+            ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == window.captureWindowID
+        }) {
+            continuation.resume(returning: nil); return
+        }
+        guard attemptsRemaining > 0 else {
+            continuation.resume(returning: "应用已激活，系统尚未切换到窗口所在桌面"); return
+        }
+        queue.asyncAfter(deadline: .now() + 0.1) { [self] in
+            finishCaptureActivation(window, attemptsRemaining: attemptsRemaining - 1, continuation: continuation)
         }
     }
 

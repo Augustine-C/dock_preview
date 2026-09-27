@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     }
                     report["captureChecks"] = checks
                 }
+                report["canOfferQuit"] = await service.canOfferQuit(pid: target.processIdentifier)
                 report["bundleID"] = bundleID
                 report["frontmostApp"] = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? ""
                 report["screenCapture"] = CGPreflightScreenCaptureAccess()
@@ -42,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                         let content = try await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
                         report["captureWindows"] = content.windows.filter { $0.owningApplication?.processID == target.processIdentifier }.map {
                             ["windowID": $0.windowID, "onScreen": $0.isOnScreen, "layer": $0.windowLayer,
+                             "hasTitle": !($0.title ?? "").isEmpty,
                              "frame": [$0.frame.minX, $0.frame.minY, $0.frame.width, $0.frame.height]] as [String: Any]
                         }
                     } catch { report["captureError"] = error.localizedDescription }

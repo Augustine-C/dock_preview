@@ -44,7 +44,7 @@ final class WindowCard: NSView {
         title.frame = CGRect(x: 10, y: 23, width: frame.width - 20, height: 16)
         detail.font = .systemFont(ofSize: 10); detail.textColor = .secondaryLabelColor
         detail.frame = CGRect(x: 10, y: 7, width: frame.width - 20, height: 14)
-        detail.stringValue = record.minimized ? "已最小化 · 标题预览" : (record.menuOnly ? "其他桌面 · 点击切换" : "标题预览")
+        detail.stringValue = record.minimized ? "已最小化 · 标题预览" : (record.menuOnly ? "其他桌面" : "标题预览")
         close.frame = CGRect(x: frame.width - 29, y: frame.height - 29, width: 23, height: 23)
         close.bezelStyle = .circular; close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "关闭窗口")
         close.target = self; close.action = #selector(closePressed)
@@ -96,7 +96,8 @@ final class PanelController {
     private let scroll = NSScrollView()
     private let document = FlippedView()
     private let heading = NSTextField(labelWithString: "")
-    private let footer = NSTextField(labelWithString: "")
+    private let quitButton = NSButton(title: "退出应用", target: nil, action: nil)
+    private var emptyState = false
     private(set) var cards: [WindowCard] = []
     private var selectedIndex = 0
     private var columns = 1
@@ -104,6 +105,7 @@ final class PanelController {
     var onClose: ((WindowRecord) -> Void)?
     var onDismiss: (() -> Void)?
     var onScroll: (() -> Void)?
+    var onQuit: (() -> Void)?
     init() {
         panel = PreviewPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false; panel.backgroundColor = .clear; panel.hasShadow = true
@@ -115,10 +117,12 @@ final class PanelController {
         effect.wantsLayer = true; effect.layer?.cornerRadius = 14; effect.layer?.masksToBounds = true
         panel.contentView = effect
         heading.font = .systemFont(ofSize: 13, weight: .semibold)
-        footer.font = .systemFont(ofSize: 10); footer.textColor = .secondaryLabelColor
         scroll.drawsBackground = false; scroll.hasVerticalScroller = true; scroll.autohidesScrollers = true
         scroll.documentView = document
-        effect.addSubview(heading); effect.addSubview(scroll); effect.addSubview(footer)
+        quitButton.bezelStyle = .rounded
+        quitButton.target = self; quitButton.action = #selector(quitPressed)
+        quitButton.isHidden = true
+        effect.addSubview(heading); effect.addSubview(scroll); effect.addSubview(quitButton)
         scroll.contentView.postsBoundsChangedNotifications = true
         NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification, object: scroll.contentView, queue: .main) { [weak self] _ in self?.onScroll?() }
         NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: panel, queue: .main) { [weak self] _ in self?.applySelection() }
@@ -126,6 +130,9 @@ final class PanelController {
     }
     func show(records: [WindowRecord], target: DockTarget, width: CGFloat, screen: NSScreen,
               cached: (WindowRecord) -> NSImage?) {
+        emptyState = records.isEmpty
+        quitButton.isHidden = !emptyState
+        scroll.isHidden = emptyState
         let previouslySelected = cards.indices.contains(selectedIndex) ? cards[selectedIndex].record.id : nil
         let oldOrigin = scroll.contentView.bounds.origin
         cards.forEach { $0.removeFromSuperview() }; cards.removeAll()
@@ -133,18 +140,20 @@ final class PanelController {
         let cardWidth = min(width, max(80, screen.visibleFrame.width - 48))
         let cardHeight = cardWidth * 0.625 + 42
         let rows = Int(ceil(Double(records.count) / Double(columns)))
-        let contentHeight = CGFloat(rows) * (cardHeight + 10) - 10
+        let contentHeight = emptyState ? 38 : CGFloat(rows) * (cardHeight + 10) - 10
         let panelWidth = CGFloat(columns) * (cardWidth + 10) + 14
         let viewHeight = min(contentHeight, max(80, screen.visibleFrame.height - 140))
-        let panelHeight = viewHeight + 68
+        let panelHeight = viewHeight + 48
         let frame = PanelLayout.frame(size: CGSize(width: panelWidth, height: panelHeight), anchor: target.anchor,
                                       screen: screen.visibleFrame, edge: target.edge)
         panel.setFrame(frame, display: false)
-        heading.stringValue = "\(target.app.localizedName ?? "应用") · \(records.count) 个窗口"
+        heading.stringValue = emptyState ? (target.app.localizedName ?? "应用") : "\(target.app.localizedName ?? "应用") · \(records.count) 个窗口"
+        quitButton.frame = CGRect(x: 12, y: 10, width: frame.width - 24, height: 32)
         heading.frame = CGRect(x: 14, y: frame.height - 30, width: frame.width - 28, height: 18)
-        footer.stringValue = "点击切换 · × 关闭 · 点击后可用方向键 / Enter / Esc"
-        footer.frame = CGRect(x: 14, y: 9, width: frame.width - 28, height: 14)
-        scroll.frame = CGRect(x: 12, y: 30, width: frame.width - 24, height: viewHeight)
+        heading.textColor = .labelColor
+        heading.toolTip = nil
+        heading.lineBreakMode = .byTruncatingTail
+        scroll.frame = CGRect(x: 12, y: 10, width: frame.width - 24, height: viewHeight)
         document.frame = CGRect(x: 0, y: 0, width: frame.width - 24, height: contentHeight)
         for (index, record) in records.enumerated() {
             let card = WindowCard(record: record, icon: target.app.icon,
@@ -167,9 +176,19 @@ final class PanelController {
         cards.filter { $0.frame.intersects(scroll.contentView.bounds) }.map(\.record)
     }
     func update(id: UUID, image: NSImage?, status: String) { cards.first { $0.record.id == id }?.update(image: image, status: status) }
-    func error(_ message: String) { footer.stringValue = message }
+    func error(_ message: String) {
+        heading.stringValue = message
+        heading.textColor = .systemRed
+        heading.toolTip = message
+    }
     func hide() { panel.orderOut(nil); cards.forEach { $0.removeFromSuperview() }; cards.removeAll() }
+    @objc private func quitPressed() { onQuit?() }
     private func key(_ code: UInt16) {
+        if emptyState {
+            if code == 53 { onDismiss?() }
+            else if code == 36 || code == 76 { onQuit?() }
+            return
+        }
         guard !cards.isEmpty else { return }
         switch code {
         case 53: onDismiss?(); return

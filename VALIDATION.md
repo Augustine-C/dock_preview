@@ -111,3 +111,27 @@ Release 构建、固定签名校验、16 项核心测试通过，已安装并启
 ## 用户交互验收确认
 
 2026-09-27，用户在安装版 0.1.7 上反馈“都可以了”，确认之前报告的跨桌面/全屏环境窗口预览与点击切换问题已恢复正常。这是用户实际操作反馈；完整应用兼容性矩阵、未保存关闭流程与性能目标仍按前述待测项保留。
+
+## 0.1.8–0.1.9：简化面板与无窗口退出
+
+0.1.8 去掉底部用法说明，减少 20 pt 留白，错误提示移至标题区域。
+
+0.1.9 在明确没有窗口时显示应用名及“退出应用”按钮，Enter 可触发、Escape 可关闭。空状态不启动截图刷新，仍监听窗口变化。显示条件要求 AXWindows 查询成功且没有 AXWindow、窗口菜单无窗口项、CG 系统窗口列表无该进程的常规内容窗口；查询失败不显示退出。点击时再次检查空状态，协同激活目标应用后再次确认，然后发送 NSRunningApplication.terminate 正常退出请求，不使用 forceTerminate。
+
+18 项核心测试、Release 构建及固定签名验证通过。用无用户数据的专用 AppKit 测试应用实测：零窗口 canOfferQuit=true；存在窗口且 AX 列表为空的其他桌面场景 canOfferQuit=false，系统窗口列表阻止误判。测试 app 已清理，安装版 0.1.9 正常运行。实际按钮点击及目标应用的退出确认 UI 尚未验收。
+
+## 0.1.10：Terminal / Safari 空状态修正
+
+用户指定 Terminal 和 Safari 没有窗口时未显示退出按钮。安装版只读诊断确认两个应用 AXWindows 与窗口菜单均为空，但 CG 列表分别保留一个 500×500 和一个 541×135 的隐藏、无标题、layer=0 内部窗口，旧尺寸判断把它们误认成用户窗口。
+
+CG 防误判检查调整为尺寸有效且具有可见状态或非空标题；无屏幕录制权限时标题可能被隐藏，仍保守判定。已命名的其他桌面窗口继续阻止空状态，AX 窗口与菜单检查不变。
+
+Release 构建及签名校验通过，已安装并启动 0.1.10。用户指定应用的只读实机复查：Terminal canOfferQuit=true；Safari canOfferQuit=true，两者 includedWindows 均为 0。证据 build/terminal-quit-fixed.json 和 build/safari-quit-fixed.json，报告不含窗口标题或图像。此次未自动退出用户应用。
+
+## 0.1.11：System Settings 跨桌面窗口发现
+
+用户指定 System Settings 打开窗口未显示。只读诊断确认 AXWindows/直接 AX 子窗口/窗口菜单均为空，而 ScreenCaptureKit 暴露一个有标题的 740×625 普通窗口。
+
+当 AX 与窗口菜单均未提供记录且屏幕录制权限有效时，增加系统窗口列表回退：仅收集同 PID、layer=0、尺寸有效且有非空标题的窗口，身份绑定明确 CGWindowID，截图直接匹配该 PID 和 ID，不伪造 AX 窗口目标。回退卡片不提供关闭；选择后协同激活应用，再尝试解析真实 AX 窗口并聚焦。若仍没有 AX 对象，只允许单窗口应用通过正常激活切换，并检查该 ID 是否出现在当前屏幕；多窗口无法可靠选择时报告失败。
+
+18 项核心测试、Release 构建、固定签名验证通过，已安装并运行 0.1.11。用户指定 System Settings 实机检查：includedWindows=1，imageAvailable=true，canOfferQuit=false。证据 build/settings-fixed-check.json，仅含状态元数据。实际点击切换未自动验收；未修改系统设置。

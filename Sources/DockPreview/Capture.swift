@@ -37,9 +37,14 @@ final class CaptureService {
             let axDescriptors = allRecords.map(\.descriptor)
             for record in records {
                 guard let recordIndex = allRecords.firstIndex(where: { $0.id == record.id }) else { continue }
-                let matched = record.menuOnly
-                    ? WindowMatcher.mutuallyUniqueTitleMatch(at: recordIndex, windows: axDescriptors, candidates: descriptors)
-                    : WindowMatcher.mutuallyUniqueMatch(at: recordIndex, windows: axDescriptors, candidates: descriptors)
+                let matched: Int?
+                if let windowID = record.captureWindowID {
+                    matched = candidates.firstIndex { $0.windowID == windowID && $0.owningApplication?.processID == record.pid }
+                } else {
+                    matched = record.menuOnly
+                        ? WindowMatcher.mutuallyUniqueTitleMatch(at: recordIndex, windows: axDescriptors, candidates: descriptors)
+                        : WindowMatcher.mutuallyUniqueMatch(at: recordIndex, windows: axDescriptors, candidates: descriptors)
+                }
                 guard let index = matched else {
                     logger.info("match_unavailable pid=\(record.pid) menu_only=\(record.menuOnly)")
                     update(record.id, cached(record), cached(record) == nil ? "画面不可用" : "缓存预览")

@@ -38,6 +38,7 @@ final class PreviewCoordinator {
         ui.onClose = { [weak self] record in self?.operate(record, close: true) }
         ui.onDismiss = { [weak self] in self?.dismiss() }
         ui.onScroll = { [weak self] in self?.requestCapture() }
+        ui.onQuit = { [weak self] in self?.quitEmptyApplication() }
         settings.$paused.dropFirst().sink { [weak self] _ in self?.hide() }.store(in: &subscriptions)
         settings.$cardWidth.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.render() }
@@ -183,14 +184,15 @@ final class PreviewCoordinator {
         Task { [weak self] in
             guard let self else { return }
             let result = await self.accessibility.windows(pid: target.app.processIdentifier)
+            let canQuit = result.isEmpty ? await self.accessibility.canOfferQuit(pid: target.app.processIdentifier) : false
             self.discoveryBusy = false
             guard self.hover.accepts(token) else {
                 if self.hover.presented { self.discover() }; return
             }
             guard AXIsProcessTrusted() else { self.hide(); return }
-            guard !result.isEmpty else { self.hide(); return }
+            guard !result.isEmpty || canQuit else { self.hide(); return }
             let changed = result.count != self.records.count || zip(result, self.records).contains {
-                $0.id != $1.id || $0.title != $1.title || $0.minimized != $1.minimized || $0.frame != $1.frame || $0.canClose != $1.canClose
+                $0.id != $1.id || $0.title != $1.title || $0.minimized != $1.minimized || $0.frame != $1.frame || $0.canClose != $1.canClose || $0.menuOnly != $1.menuOnly || $0.captureWindowID != $1.captureWindowID
             }
             self.records = result
             if changed || !self.ui.panel.isVisible {
@@ -208,7 +210,7 @@ final class PreviewCoordinator {
         }
     }
     private func render() {
-        guard let target, let screen, !records.isEmpty, hover.presented else { return }
+        guard let target, let screen, hover.presented else { return }
         ui.show(records: records, target: target, width: settings.cardWidth, screen: screen, cached: capture.cached)
     }
     private func reposition() {
@@ -218,7 +220,7 @@ final class PreviewCoordinator {
     }
     private func requestCapture() {
         let now = ProcessInfo.processInfo.systemUptime
-        guard screenshotTask == nil, ui.panel.isVisible, now - lastCapture >= 2, CGPreflightScreenCaptureAccess() else { return }
+        guard !records.isEmpty, screenshotTask == nil, ui.panel.isVisible, now - lastCapture >= 2, CGPreflightScreenCaptureAccess() else { return }
         lastCapture = now
         let token = hover.generation, visible = ui.visibleRecords, allRecords = records
         screenshotTask = Task { [weak self] in
@@ -233,6 +235,20 @@ final class PreviewCoordinator {
             if self.hover.generation != token { self.requestCapture() }
         }
     }
+    private func quitEmptyApplication() {
+        guard !operationBusy, records.isEmpty, let target, ui.panel.isVisible else { return }
+        operationBusy = true
+        let token = hover.generation
+        Task { [weak self] in
+            guard let self else { return }
+            defer { self.operationBusy = false }
+            let error = await self.accessibility.quitApplicationIfEmpty(pid: target.app.processIdentifier)
+            guard self.hover.accepts(token) else { return }
+            if let error { self.ui.error(error); self.discover() }
+            else { self.dismiss() }
+        }
+    }
+
     private func operate(_ record: WindowRecord, close: Bool) {
         guard !operationBusy else { return }
         operationBusy = true
