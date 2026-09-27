@@ -24,7 +24,9 @@ open "build/Dock Preview.app"
 ./scripts/package-dmg.sh --skip-build  # 使用已经构建的应用
 ```
 
-成品为 `build/Dock-Preview-<版本>-arm64.dmg`，包含应用、Applications 快捷方式、MIT 许可证和中英文安装指南。打包只对分发副本使用 ad-hoc 签名，不改变本机构建的签名。此分发包未经 Apple 公证；首次打开与权限设置步骤见 [中文指南](docs/Installation-ZH.txt) 或 [English installation guide](docs/Installation-EN.txt)。
+成品为 `build/Dock-Preview-<版本>-arm64.dmg`，包含应用、Applications 快捷方式、MIT 许可证和中英文安装指南。打开时使用固定 Finder 布局，中英文背景说明与箭头提示将左侧应用拖到右侧 Applications。打包需要 Python 3，首次运行在忽略的 `build/dmg-tools` 中安装固定版本的 Finder 元数据工具；应用本身不增加依赖。背景由 `scripts/make-dmg-background.swift` 生成，布局由 `scripts/dmg-layout.py` 设置。
+
+打包只对分发副本使用 ad-hoc 签名，不改变本机构建的签名。此分发包未经 Apple 公证；首次打开与权限设置步骤见 [中文指南](docs/Installation-ZH.txt) 或 [English installation guide](docs/Installation-EN.txt)。
 
 界面默认跟随系统首选语言，支持简体中文和英文，不支持的语言回退到英文。“设置 → 语言”可手动切换，立即生效并保留选择。系统弹窗和其他应用的窗口标题使用它们自身的语言。
 
