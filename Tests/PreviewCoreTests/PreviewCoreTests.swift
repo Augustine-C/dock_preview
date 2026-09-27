@@ -141,4 +141,16 @@ final class PreviewCoreTests: XCTestCase {
         XCTAssertNil(WindowMatcher.mutuallyUniqueTitleMatch(at: 0, windows: [menu, shot], candidates: [shot]))
     }
 
+    func testLanguageFollowsSupportedSystemPreference() {
+        XCTAssertEqual(InterfaceLanguage.system.resolved(preferredLanguages: ["zh-Hant-TW", "en-US"]), "zh-Hans")
+        XCTAssertEqual(InterfaceLanguage.system.resolved(preferredLanguages: ["en-GB", "zh-Hans"]), "en")
+        XCTAssertEqual(InterfaceLanguage.system.resolved(preferredLanguages: ["fr-FR", "zh-Hans-CN"]), "zh-Hans")
+        XCTAssertEqual(InterfaceLanguage.system.resolved(preferredLanguages: ["fr-FR"]), "en")
+        XCTAssertEqual(InterfaceLanguage.system.resolved(preferredLanguages: []), "en")
+    }
+    func testManualLanguageOverridesSystemPreference() {
+        XCTAssertEqual(InterfaceLanguage.english.resolved(preferredLanguages: ["zh-Hans"]), "en")
+        XCTAssertEqual(InterfaceLanguage.chinese.resolved(preferredLanguages: ["en-US"]), "zh-Hans")
+    }
+
 }

@@ -8,6 +8,7 @@ app="${PWD}/build/Dock Preview.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp .build/arm64-apple-macosx/release/DockPreview "$app/Contents/MacOS/DockPreview"
 cp Resources/Info.plist "$app/Contents/Info.plist"
+cp -R Resources/en.lproj Resources/zh-Hans.lproj "$app/Contents/Resources/"
 xcrun swiftc -target arm64-apple-macosx27.0 -module-cache-path "$SWIFTPM_MODULECACHE_OVERRIDE" scripts/make-icon.swift -o .build/make-icon
 .build/make-icon .build/AppIcon.iconset "$app/Contents/Resources/AppIcon.icns"
 # Keep the explicitly selected identity stable across local rebuilds.

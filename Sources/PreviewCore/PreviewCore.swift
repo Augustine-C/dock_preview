@@ -1,6 +1,22 @@
 import Foundation
 import CoreGraphics
 
+public enum InterfaceLanguage: String, CaseIterable {
+    case system
+    case english = "en"
+    case chinese = "zh-Hans"
+
+    public func resolved(preferredLanguages: [String]) -> String {
+        guard self == .system else { return rawValue }
+        for language in preferredLanguages {
+            let code = language.lowercased().split(separator: "-").first.map(String.init)
+            if code == "zh" { return Self.chinese.rawValue }
+            if code == "en" { return Self.english.rawValue }
+        }
+        return Self.english.rawValue
+    }
+}
+
 public struct WindowDescriptor: Equatable, Sendable {
     public let pid: Int32
     public let title: String

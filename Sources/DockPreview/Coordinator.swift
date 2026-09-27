@@ -39,6 +39,7 @@ final class PreviewCoordinator {
         ui.onDismiss = { [weak self] in self?.dismiss() }
         ui.onScroll = { [weak self] in self?.requestCapture() }
         ui.onQuit = { [weak self] in self?.quitEmptyApplication() }
+        settings.$language.dropFirst().sink { [weak self] _ in self?.hide() }.store(in: &subscriptions)
         settings.$paused.dropFirst().sink { [weak self] _ in self?.hide() }.store(in: &subscriptions)
         settings.$cardWidth.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.render() }

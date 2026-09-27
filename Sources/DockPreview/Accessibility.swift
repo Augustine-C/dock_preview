@@ -167,11 +167,11 @@ final class AccessibilityService: @unchecked Sendable {
                                                      minimizable: settable.boolValue) else { return nil }
                     let id = previous?.id ?? old.first { CFEqual($0.0, element) }?.1 ?? UUID()
                     fresh.append((element, id))
-                    let title: String = attribute(element, kAXTitleAttribute) ?? previous?.title ?? "未命名窗口"
+                    let title: String = attribute(element, kAXTitleAttribute) ?? previous?.title ?? L10n.text("未命名窗口")
                     let close: AXUIElement? = attribute(element, kAXCloseButtonAttribute)
                     let enabled: Bool = close.flatMap { attribute($0, kAXEnabledAttribute) } ?? false
                     return WindowRecord(id: id, pid: pid, element: element,
-                                        title: title.isEmpty ? "未命名窗口" : title, frame: frame ?? .zero,
+                                        title: title.isEmpty ? L10n.text("未命名窗口") : title, frame: frame ?? .zero,
                                         minimized: minimized,
                                         canClose: close != nil && enabled)
                 }
@@ -251,12 +251,12 @@ final class AccessibilityService: @unchecked Sendable {
     }
 
     func quitApplicationIfEmpty(pid: pid_t) async -> String? {
-        guard await canOfferQuit(pid: pid) else { return "应用已有窗口，或暂时无法确认窗口状态" }
-        guard await activateTarget(pid: pid) else { return "无法激活应用，请重试" }
-        guard await canOfferQuit(pid: pid) else { return "应用已有窗口，退出操作已取消" }
+        guard await canOfferQuit(pid: pid) else { return L10n.text("应用已有窗口，或暂时无法确认窗口状态") }
+        guard await activateTarget(pid: pid) else { return L10n.text("无法激活应用，请重试") }
+        guard await canOfferQuit(pid: pid) else { return L10n.text("应用已有窗口，退出操作已取消") }
         return await MainActor.run {
             guard let app = NSRunningApplication(processIdentifier: pid), !app.isTerminated else { return nil }
-            return app.terminate() ? nil : "应用未接受退出请求"
+            return app.terminate() ? nil : L10n.text("应用未接受退出请求")
         }
     }
 
@@ -299,13 +299,13 @@ final class AccessibilityService: @unchecked Sendable {
 
     func perform(_ window: WindowRecord, close: Bool) async -> String? {
         if !close, !(await activateTarget(pid: window.pid)) {
-            return "系统未允许切换到目标应用，请重试"
+            return L10n.text("系统未允许切换到目标应用，请重试")
         }
         return await withCheckedContinuation { continuation in
             queue.async { [self] in
                 AXUIElementSetMessagingTimeout(window.element, 0.25)
                 if window.captureWindowID != nil {
-                    guard !close else { continuation.resume(returning: "无法安全关闭此窗口"); return }
+                    guard !close else { continuation.resume(returning: L10n.text("无法安全关闭此窗口")); return }
                     let app = AXUIElementCreateApplication(window.pid)
                     let elements: [AXUIElement] = attribute(app, kAXWindowsAttribute) ?? []
                     let actual = elements.compactMap { element -> WindowRecord? in
@@ -324,7 +324,7 @@ final class AccessibilityService: @unchecked Sendable {
                     } else if knownRecords[window.pid]?.count == 1 {
                         finishCaptureActivation(window, attemptsRemaining: 15, continuation: continuation)
                     } else {
-                        continuation.resume(returning: "应用已激活，但无法安全选择该窗口")
+                        continuation.resume(returning: L10n.text("应用已激活，但无法安全选择该窗口"))
                     }
                     return
                 }
@@ -332,7 +332,7 @@ final class AccessibilityService: @unchecked Sendable {
                     guard !close,
                           (attribute(window.element, kAXIdentifierAttribute) as String?) == "makeKeyAndOrderFront:",
                           (attribute(window.element, kAXTitleAttribute) as String?) == window.title else {
-                        continuation.resume(returning: "窗口列表已变化，请重新打开预览"); return
+                        continuation.resume(returning: L10n.text("窗口列表已变化，请重新打开预览")); return
                     }
                     let error = AXUIElementPerformAction(window.element, kAXPressAction as CFString)
                     logger.info("menu_select pid=\(window.pid) ax=\(error.rawValue)")
@@ -368,7 +368,7 @@ final class AccessibilityService: @unchecked Sendable {
             continuation.resume(returning: nil); return
         }
         guard attemptsRemaining > 0 else {
-            continuation.resume(returning: "应用已激活，系统尚未切换到窗口所在桌面"); return
+            continuation.resume(returning: L10n.text("应用已激活，系统尚未切换到窗口所在桌面")); return
         }
         queue.asyncAfter(deadline: .now() + 0.1) { [self] in
             finishCaptureActivation(window, attemptsRemaining: attemptsRemaining - 1, continuation: continuation)
@@ -380,7 +380,7 @@ final class AccessibilityService: @unchecked Sendable {
         let minimized: Bool = attribute(window.element, kAXMinimizedAttribute) ?? false
         if minimized {
             guard attemptsRemaining > 0 else {
-                continuation.resume(returning: "窗口暂未恢复，请重试或在应用中恢复"); return
+                continuation.resume(returning: L10n.text("窗口暂未恢复，请重试或在应用中恢复")); return
             }
             // Restoration can be asynchronous. Do not raise a still-miniaturized
             // window, and do not block the AX queue while waiting for its transition.
@@ -412,7 +412,7 @@ final class AccessibilityService: @unchecked Sendable {
     }
 
     private func operationError(_ error: AXError) -> String? {
-        error == .success ? nil : "操作未完成，请在应用中操作（\(error.rawValue)）"
+        error == .success ? nil : L10n.format("操作未完成，请在应用中操作（%d）", error.rawValue)
     }
 
     /// Read-only diagnostics from the app's own authorized identity. No screenshots,

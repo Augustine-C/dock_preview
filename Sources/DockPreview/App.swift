@@ -57,16 +57,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "Dock Preview")
-        item.button?.toolTip = "Dock Preview · 窗口预览"
+        item.button?.toolTip = L10n.text("Dock Preview · 窗口预览")
         let menu = NSMenu()
-        menu.addItem(withTitle: "设置与权限…", action: #selector(openSettings), keyEquivalent: ",").target = self
-        menu.addItem(withTitle: "暂停预览", action: #selector(togglePause(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: L10n.text("设置与权限…"), action: #selector(openSettings), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: L10n.text("暂停预览"), action: #selector(togglePause(_:)), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出 Dock Preview", action: #selector(quit), keyEquivalent: "q").target = self
+        menu.addItem(withTitle: L10n.text("退出 Dock Preview"), action: #selector(quit), keyEquivalent: "q").target = self
         menu.delegate = self
         item.menu = menu; self.item = item
+        NotificationCenter.default.addObserver(self, selector: #selector(refreshLanguage), name: .interfaceLanguageDidChange, object: nil)
         coordinator = PreviewCoordinator(settings: settings); coordinator?.start()
-        if CommandLine.arguments.contains("--demo") { showDemo() }
+        if CommandLine.arguments.contains("--settings") { openSettings() }
+        else if CommandLine.arguments.contains("--demo") { showDemo() }
         else if !AXIsProcessTrusted() { openSettings() }
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -76,9 +78,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc private func openSettings() {
         coordinator?.dismiss()
         if settingsWindow == nil {
-            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 520, height: 570),
+            let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 560, height: 680),
                                   styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-            window.title = "Dock Preview 设置"; window.isReleasedWhenClosed = false; window.delegate = self
+            window.title = L10n.text("Dock Preview 设置"); window.isReleasedWhenClosed = false; window.delegate = self
             window.contentView = NSHostingView(rootView: SettingsView(settings: settings))
             window.center(); settingsWindow = window
         }
@@ -89,14 +91,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         settingsWindow?.contentView = nil
         settingsWindow = nil
     }
+    @objc private func refreshLanguage() {
+        item?.button?.toolTip = L10n.text("Dock Preview · 窗口预览")
+        item?.menu?.items.first { $0.action == #selector(openSettings) }?.title = L10n.text("设置与权限…")
+        item?.menu?.items.first { $0.action == #selector(togglePause(_:)) }?.title = L10n.text("暂停预览")
+        item?.menu?.items.first { $0.action == #selector(quit) }?.title = L10n.text("退出 Dock Preview")
+        settingsWindow?.title = L10n.text("Dock Preview 设置")
+    }
     func menuNeedsUpdate(_ menu: NSMenu) {
+        refreshLanguage()
         menu.items.first { $0.action == #selector(togglePause(_:)) }?.state = settings.paused ? .on : .off
     }
     @objc private func togglePause(_ sender: NSMenuItem) {
         settings.paused.toggle(); sender.state = settings.paused ? .on : .off
     }
     @objc private func quit() { NSApp.terminate(nil) }
-    func applicationWillTerminate(_ notification: Notification) { coordinator?.stop() }
+    func applicationWillTerminate(_ notification: Notification) {
+        NotificationCenter.default.removeObserver(self, name: .interfaceLanguageDidChange, object: nil)
+        coordinator?.stop()
+    }
     private func showDemo() {
         guard let screen = NSScreen.main else { return }
         coordinator?.stop()
@@ -104,13 +117,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let pid = ProcessInfo.processInfo.processIdentifier
         let records = (1...6).map { i in
             WindowRecord(id: UUID(), pid: pid, element: AXUIElementCreateApplication(pid),
-                         title: ["项目设计 · Safari", "终端 — swift build", "README.md", "资料整理", "邮件", "已最小化的窗口"][i-1],
+                         title: [L10n.text("项目设计 · Safari"), L10n.text("终端 — swift build"), "README.md", L10n.text("资料整理"), L10n.text("邮件"), L10n.text("已最小化的窗口")][i-1],
                          frame: CGRect(x: 0, y: 0, width: 1000, height: 700), minimized: i == 6, canClose: true)
         }
         let target = DockTarget(app: NSRunningApplication.current,
                                 anchor: CGRect(x: screen.frame.midX - 25, y: screen.visibleFrame.minY, width: 50, height: 50), edge: .bottom)
-        panel.onChoose = { _ in panel.error("演示模式：不会操作真实窗口") }
-        panel.onClose = { _ in panel.error("演示模式：不会关闭真实窗口") }
+        panel.onChoose = { _ in panel.error(L10n.text("演示模式：不会操作真实窗口")) }
+        panel.onClose = { _ in panel.error(L10n.text("演示模式：不会关闭真实窗口")) }
         panel.onDismiss = { panel.hide() }
         panel.show(records: records, target: target, width: 220, screen: screen, cached: { _ in nil })
         demoPanel = panel
@@ -126,7 +139,9 @@ if CommandLine.arguments.contains("--diagnose") {
         "accessibility": AXIsProcessTrusted(),
         "screenCapture": CGPreflightScreenCaptureAccess(),
         "architecture": "arm64",
-        "minimumOS": "27.0"
+        "minimumOS": "27.0",
+        "settingsTitle": L10n.text("Dock Preview 设置"),
+        "quitLabel": L10n.text("退出应用")
     ]
     if let data = try? JSONSerialization.data(withJSONObject: information, options: [.prettyPrinted, .sortedKeys]) {
         print(String(decoding: data, as: UTF8.self))

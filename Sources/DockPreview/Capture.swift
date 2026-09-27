@@ -47,12 +47,12 @@ final class CaptureService {
                 }
                 guard let index = matched else {
                     logger.info("match_unavailable pid=\(record.pid) menu_only=\(record.menuOnly)")
-                    update(record.id, cached(record), cached(record) == nil ? "画面不可用" : "缓存预览")
+                    update(record.id, cached(record), cached(record) == nil ? L10n.text("画面不可用") : L10n.text("缓存预览"))
                     continue
                 }
                 let window = candidates[index]
                 guard used.insert(window.windowID).inserted else {
-                    update(record.id, nil, "画面匹配不明确"); continue
+                    update(record.id, nil, L10n.text("画面匹配不明确")); continue
                 }
                 let key = "\(record.pid):\(window.windowID)"
                 keys[record.id] = key
@@ -81,7 +81,7 @@ final class CaptureService {
             if keys.count > 256 { keys = keys.filter { id, _ in records.contains { $0.id == id } } }
         } catch {
             guard valid() else { return }
-            for record in records { update(record.id, cached(record), "截图暂不可用") }
+            for record in records { update(record.id, cached(record), L10n.text("截图暂不可用")) }
         }
     }
     private func screenshot(_ window: SCWindow) async -> CGImage? {
@@ -103,7 +103,7 @@ final class CaptureService {
     }
     private func deliver(_ cg: CGImage?, record: WindowRecord, update: (UUID, NSImage?, String) -> Void) {
         guard let cg, let key = keys[record.id] else {
-            update(record.id, cached(record), cached(record) == nil ? "画面不可用" : "缓存预览"); return
+            update(record.id, cached(record), cached(record) == nil ? L10n.text("画面不可用") : L10n.text("缓存预览")); return
         }
         let image = NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
         cache.insert(image, for: key, cost: cg.bytesPerRow * cg.height)

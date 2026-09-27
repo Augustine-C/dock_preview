@@ -44,15 +44,15 @@ final class WindowCard: NSView {
         title.frame = CGRect(x: 10, y: 23, width: frame.width - 20, height: 16)
         detail.font = .systemFont(ofSize: 10); detail.textColor = .secondaryLabelColor
         detail.frame = CGRect(x: 10, y: 7, width: frame.width - 20, height: 14)
-        detail.stringValue = record.minimized ? "已最小化 · 标题预览" : (record.menuOnly ? "其他桌面" : "标题预览")
+        detail.stringValue = record.minimized ? L10n.text("已最小化 · 标题预览") : (record.menuOnly ? L10n.text("其他桌面") : L10n.text("标题预览"))
         close.frame = CGRect(x: frame.width - 29, y: frame.height - 29, width: 23, height: 23)
-        close.bezelStyle = .circular; close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: "关闭窗口")
+        close.bezelStyle = .circular; close.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: L10n.text("关闭窗口"))
         close.target = self; close.action = #selector(closePressed)
         close.isEnabled = record.canClose
-        close.toolTip = record.canClose ? "关闭此窗口" : "此窗口不支持关闭"
+        close.toolTip = record.canClose ? L10n.text("关闭此窗口") : L10n.text("此窗口不支持关闭")
         addSubview(picture); addSubview(placeholder); addSubview(title); addSubview(detail); addSubview(close)
         setAccessibilityElement(true); setAccessibilityRole(.button)
-        setAccessibilityLabel(record.title + (record.minimized ? "，已最小化" : ""))
+        setAccessibilityLabel(record.title + (record.minimized ? L10n.text("，已最小化") : ""))
         toolTip = record.title
         style()
     }
@@ -78,8 +78,8 @@ final class WindowCard: NSView {
         if let image { picture.image = image; picture.isHidden = false; placeholder.isHidden = true }
         // Capture progress is internal state: keep the caption stable while a
         // usable image is displayed, including when a refresh falls back to cache.
-        let caption = picture.image != nil ? "窗口预览" : status
-        let parts = [record.minimized ? "已最小化" : "", caption].filter { !$0.isEmpty }
+        let caption = picture.image != nil ? L10n.text("窗口预览") : status
+        let parts = [record.minimized ? L10n.text("已最小化") : "", caption].filter { !$0.isEmpty }
         let text = parts.joined(separator: " · ")
         if detail.stringValue != text { detail.stringValue = text }
     }
@@ -96,7 +96,7 @@ final class PanelController {
     private let scroll = NSScrollView()
     private let document = FlippedView()
     private let heading = NSTextField(labelWithString: "")
-    private let quitButton = NSButton(title: "退出应用", target: nil, action: nil)
+    private let quitButton = NSButton(title: L10n.text("退出应用"), target: nil, action: nil)
     private var emptyState = false
     private(set) var cards: [WindowCard] = []
     private var selectedIndex = 0
@@ -147,7 +147,7 @@ final class PanelController {
         let frame = PanelLayout.frame(size: CGSize(width: panelWidth, height: panelHeight), anchor: target.anchor,
                                       screen: screen.visibleFrame, edge: target.edge)
         panel.setFrame(frame, display: false)
-        heading.stringValue = emptyState ? (target.app.localizedName ?? "应用") : "\(target.app.localizedName ?? "应用") · \(records.count) 个窗口"
+        heading.stringValue = emptyState ? (target.app.localizedName ?? L10n.text("应用")) : L10n.format("%@ · %d 个窗口", target.app.localizedName ?? L10n.text("应用"), records.count)
         quitButton.frame = CGRect(x: 12, y: 10, width: frame.width - 24, height: 32)
         heading.frame = CGRect(x: 14, y: frame.height - 30, width: frame.width - 28, height: 18)
         heading.textColor = .labelColor
@@ -161,7 +161,7 @@ final class PanelController {
                               y: CGFloat(index / columns) * (cardHeight + 10), width: cardWidth, height: cardHeight))
             card.onSelect = { [weak self] in self?.onChoose?(record) }
             card.onClose = { [weak self] in self?.onClose?(record) }
-            if let image = cached(record) { card.update(image: image, status: "缓存预览") }
+            if let image = cached(record) { card.update(image: image, status: L10n.text("缓存预览")) }
             document.addSubview(card); cards.append(card)
         }
         selectedIndex = previouslySelected.flatMap { id in cards.firstIndex { $0.record.id == id } } ?? 0
