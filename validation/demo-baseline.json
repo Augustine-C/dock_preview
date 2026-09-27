@@ -1,0 +1,81 @@
+{
+  "mode": "six-card demo; no capture; no AX permission",
+  "pid": 49065,
+  "durationSeconds": 11.09831133300031,
+  "averageCpuPercent": 0.0,
+  "maxRssMiB": 93.390625,
+  "samples": [
+    {
+      "monotonic": 42405.31748225,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42406.321719875,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42407.326746708,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42408.335268125,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42409.34371,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42410.350090208,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42411.35788125,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42412.371046541,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42413.379047416,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42414.387903166,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42415.402404208,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    },
+    {
+      "monotonic": 42416.415793583,
+      "cpuSeconds": 1.85,
+      "rssKiB": 95632,
+      "psCpuPercent": 0.0
+    }
+  ]
+}
