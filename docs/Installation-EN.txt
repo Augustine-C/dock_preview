@@ -1,0 +1,55 @@
+Dock Preview — Installation Guide
+Version 0.2.0
+
+Requirements
+• Apple Silicon Mac (M1 or newer).
+• macOS 27.0 or later. Intel Macs and earlier macOS versions are not supported.
+
+1. Install
+Open the DMG. Drag “Dock Preview.app” onto the Applications shortcut.
+If updating, quit the previous Dock Preview from its menu-bar menu first,
+then replace the app in Applications. Eject the disk image after copying.
+Launch Dock Preview from Applications, not from the disk image.
+
+2. First launch
+This distribution is ad-hoc signed and is not notarized by Apple.
+If macOS blocks the app because the developer cannot be verified, first
+attempt to open it, then open System Settings → Privacy & Security.
+If you trust this download, select Open Anyway and confirm the launch.
+A managed Mac may restrict this option. Do not disable Gatekeeper or SIP.
+Apple’s instructions: https://support.apple.com/102445
+
+3. Permissions
+Open Dock Preview’s menu-bar icon → Settings & Permissions.
+Click Grant Access next to Accessibility, then enable Dock Preview in
+System Settings → Privacy & Security → Accessibility.
+Grant Screen Recording to enable thumbnails. Depending on macOS, the pane
+may be named Screen & System Audio Recording. Without this permission,
+available windows can still appear as title cards.
+If macOS requests a restart, quit and reopen Dock Preview.
+Permission changes are made by you; the app cannot grant them itself.
+
+4. Language
+Settings → Language offers System Default, English, and 简体中文.
+The default follows your preferred system languages. Chinese preferences
+use Simplified Chinese; unsupported languages fall back to English.
+A manual selection applies immediately and is remembered.
+macOS dialogs and other apps’ window titles use their own language.
+
+5. Use
+Hover over a running app’s Dock icon to show its windows. Click a card to
+switch to it; use its × button to request closing. A windowless app offers
+Quit App when its empty state can be verified. Previews may use cached
+images or title cards when macOS does not expose a reliable screenshot.
+Login launch is off by default and can be enabled in Settings.
+Previews stay in memory and are not saved or uploaded.
+
+Troubleshooting / removal
+If access was granted but still appears unavailable, quit and reopen the
+app. If necessary, remove its old Accessibility entry and add the copy in
+Applications again. Rebuilding or changing the signing identity may
+require permissions to be granted again.
+To uninstall, quit Dock Preview and move its app from Applications to Trash.
+
+Source and issue reports: https://github.com/Augustine-C/dock_preview
+License: MIT (see License.txt in this disk image).

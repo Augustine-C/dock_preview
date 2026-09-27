@@ -15,7 +15,18 @@ open "build/Dock Preview.app"
 
 首次启动会显示设置页，不会自动申请权限。点击“辅助功能 → 授权”以允许识别、恢复和关闭窗口；点击“屏幕录制 → 授权”以启用缩略图。系统设置中的权限需要用户自行确认。屏幕录制未授权时可使用标题列表。授权后若系统要求重新启动，请从菜单栏退出再打开。
 
-构建默认采用本地 ad-hoc 签名。重建或移动应用后系统可能要求重新授权。若有自己的签名证书，使用 `SIGNING_IDENTITY="证书名称" ./scripts/build.sh`。当前版本不用于公开分发，也未公证。
+构建默认采用本地 ad-hoc 签名。重建或更换签名后系统可能要求重新授权。若有自己的签名证书，使用 `SIGNING_IDENTITY="证书名称" ./scripts/build.sh`。
+
+## 安装包与语言
+
+```sh
+./scripts/package-dmg.sh               # 构建并生成可分享的 DMG
+./scripts/package-dmg.sh --skip-build  # 使用已经构建的应用
+```
+
+成品为 `build/Dock-Preview-<版本>-arm64.dmg`，包含应用、Applications 快捷方式、MIT 许可证和中英文安装指南。打包只对分发副本使用 ad-hoc 签名，不改变本机构建的签名。此分发包未经 Apple 公证；首次打开与权限设置步骤见 [中文指南](docs/Installation-ZH.txt) 或 [English installation guide](docs/Installation-EN.txt)。
+
+界面默认跟随系统首选语言，支持简体中文和英文，不支持的语言回退到英文。“设置 → 语言”可手动切换，立即生效并保留选择。系统弹窗和其他应用的窗口标题使用它们自身的语言。
 
 ## 使用
 
