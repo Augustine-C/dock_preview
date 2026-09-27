@@ -151,3 +151,9 @@ Release 构建及签名校验通过，已安装并启动 0.1.10。用户指定�
 安装包增加中英文背景说明、从应用指向 Applications 的箭头、固定图标位置与独立指南区域。背景通过 AppKit 生成；Finder 元数据由固定版本 ds-store/mac-alias 写入挂载卷，再压缩为只读 DMG，避免背景引用指向构建目录。工具依赖只用于打包，不进入应用。
 
 实机 Finder 验证最终只读包：背景和箭头可见，应用位于左侧、Applications 链接位于右侧，两份指南、许可证和双语底部提示均完整显示。磁盘映像 checksum 与包内应用签名校验通过，shell 语法、Python 语法与 diff 检查通过。Xcode 当前要求接受许可证，背景编译使用已安装的 Command Line Tools 完成，未代替用户接受协议。未改变应用代码，未重跑 XCTest 或跨机安装流程。最终 DMG 在 Finder 中打开供用户检查。
+
+## GitHub Actions 发布构建
+
+新增 main/PR/手动运行的测试、arm64 Release 与可视化 DMG 构建，上传 DMG、应用 ZIP 和 SHA-256 文件；匹配 Info.plist 版本的 v 标签在成功构建后发布 GitHub Release。使用官方 xcode-27 Apple Silicon macOS 27 runner，构建只读、仅标签发布拥有 contents 写权限，无证书 secrets。
+
+actionlint 与 diff 检查通过；官方 preview runner 标签尚未进入 actionlint 内置列表，通过配置声明。此次本机测试重跑受 Xcode 待接受许可证阻塞，备用 Command Line Tools 的 PackageDescription 不支持 swiftLanguageModes，因此不能代替当前 Xcode；未修改 SwiftPM 配置或代用户接受许可证。20 项测试此前在当前 Xcode 下通过；本次新增工作流的端到端结果以 GitHub Actions 实际运行记录为准。

@@ -1,0 +1,4 @@
+# GitHub-hosted public-preview label not yet in actionlint's built-in list.
+self-hosted-runner:
+  labels:
+    - xcode-27

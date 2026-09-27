@@ -30,6 +30,12 @@ open "build/Dock Preview.app"
 
 界面默认跟随系统首选语言，支持简体中文和英文，不支持的语言回退到英文。“设置 → 语言”可手动切换，立即生效并保留选择。系统弹窗和其他应用的窗口标题使用它们自身的语言。
 
+## GitHub Actions 发布构建
+
+`.github/workflows/release.yml` 在 main 推送、Pull Request 和手动运行时执行测试、构建 arm64 Release 应用并生成可视化 DMG、应用 ZIP 和 SHA-256 校验文件。使用 GitHub 的 `xcode-27` Apple Silicon runner；下载文件位于运行页面的 `Dock-Preview-arm64` artifact，保留 30 天。
+
+推送 `v<版本>` 标签时，构建成功后自动创建 GitHub Release 并上传上述文件。标签必须与 `Resources/Info.plist` 的 `CFBundleShortVersionString` 一致，例如当前版本为 `v0.2.0`。标签发布步骤拥有 contents 写权限，其余构建只读。CI 使用 ad-hoc 签名，无需签名证书或额外 secrets；产物仍未经 Apple 公证。
+
 ## 使用
 
 - 悬停正在运行的应用 Dock 图标 250 ms，显示该应用的普通窗口。

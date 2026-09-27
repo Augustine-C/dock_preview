@@ -1,0 +1,97 @@
+name: Build Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 30
+    env:
+      SIGNING_IDENTITY: '-'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Check platform and release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = arm64
+          sw_vers
+          xcodebuild -version
+          swift --version
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' Resources/Info.plist)
+          if [[ "$GITHUB_REF" == refs/tags/* && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo 'Release tag must match CFBundleShortVersionString in Resources/Info.plist.' >&2
+            exit 1
+          fi
+
+      - name: Run core tests
+        run: ./scripts/test.sh
+
+      - name: Build release app
+        run: ./scripts/build.sh
+
+      - name: Package visual installer
+        run: ./scripts/package-dmg.sh --skip-build
+
+      - name: Archive app and checksum downloads
+        working-directory: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          codesign --verify --strict 'Dock Preview.app'
+          version=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' 'Dock Preview.app/Contents/Info.plist')
+          ditto -c -k --sequesterRsrc --keepParent 'Dock Preview.app' "Dock-Preview-$version-arm64.zip"
+          shasum -a 256 ./*.dmg ./*.zip > SHA256SUMS.txt
+
+      - name: Upload release downloads
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dock-Preview-arm64
+          path: |
+            build/Dock-Preview-*-arm64.dmg
+            build/Dock-Preview-*-arm64.zip
+            build/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Dock-Preview-arm64
+          path: downloads
+
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes --title "Dock Preview $RELEASE_TAG"
+          fi
+          gh release upload "$RELEASE_TAG" downloads/* --clobber
