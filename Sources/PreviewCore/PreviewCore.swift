@@ -86,6 +86,15 @@ public struct WindowMenuAssociation {
         self.title = WindowMatcher.normalizedTitle(title)
         self.windowID = windowID
     }
+    /// AppKit's sole Window-menu entry represents its sole known main window,
+    /// even when the inactive application does not expose a selection checkmark.
+    /// Never apply this shortcut to multiple windows or an unknown main object.
+    public static func confirmedWindowID(selected: Bool, menuWindowCount: Int,
+                                         windowIDs: [UUID], mainWindowID: UUID?) -> UUID? {
+        guard let mainWindowID, windowIDs.contains(mainWindowID) else { return nil }
+        guard selected || (menuWindowCount == 1 && windowIDs.count == 1) else { return nil }
+        return mainWindowID
+    }
     public func represents(title: String, knownWindowIDs: Set<UUID>) -> Bool {
         self.title == WindowMatcher.normalizedTitle(title) && knownWindowIDs.contains(windowID)
     }

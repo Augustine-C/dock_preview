@@ -171,6 +171,27 @@ final class PreviewCoreTests: XCTestCase {
         XCTAssertFalse(association.represents(title: "Inbox", knownWindowIDs: []))
         XCTAssertFalse(association.represents(title: "Inbox", knownWindowIDs: [UUID()]))
     }
+    func testColdInactiveSingleWindowMenuUsesExactMainWindow() {
+        let mainID = UUID()
+        let matched = WindowMenuAssociation.confirmedWindowID(selected: false,
+            menuWindowCount: 1, windowIDs: [mainID], mainWindowID: mainID)
+        XCTAssertEqual(matched, mainID)
+        let association = WindowMenuAssociation(title: "Inbox", windowID: matched!)
+        XCTAssertTrue(association.represents(title: "Inbox", knownWindowIDs: [mainID]))
+    }
+    func testUnmarkedMenuDoesNotGuessAmongMultipleOrUnknownWindows() {
+        let mainID = UUID(), otherID = UUID()
+        XCTAssertNil(WindowMenuAssociation.confirmedWindowID(selected: false,
+            menuWindowCount: 2, windowIDs: [mainID], mainWindowID: mainID))
+        XCTAssertNil(WindowMenuAssociation.confirmedWindowID(selected: false,
+            menuWindowCount: 1, windowIDs: [mainID, otherID], mainWindowID: mainID))
+        XCTAssertNil(WindowMenuAssociation.confirmedWindowID(selected: false,
+            menuWindowCount: 1, windowIDs: [otherID], mainWindowID: mainID))
+        XCTAssertNil(WindowMenuAssociation.confirmedWindowID(selected: false,
+            menuWindowCount: 1, windowIDs: [mainID], mainWindowID: nil))
+        XCTAssertEqual(WindowMenuAssociation.confirmedWindowID(selected: true,
+            menuWindowCount: 2, windowIDs: [mainID, otherID], mainWindowID: mainID), mainID)
+    }
     func testMenuTitleFormattingDoesNotChangeIdentity() {
         let menu = WindowDescriptor(pid: 42, title: "\u{2068}Project\u{2069}", frame: .zero)
         let shot = WindowDescriptor(pid: 42, title: "Project", frame: .zero)

@@ -138,6 +138,12 @@ final class AccessibilityService: @unchecked Sendable {
                 for child in children where (attribute(child, kAXRoleAttribute) as String?) == kAXWindowRole as String {
                     if !elements.contains(where: { CFEqual($0, child) }) { elements.append(child) }
                 }
+                // AXWindows/children can omit the main window on another Space,
+                // even though the application still exposes the exact object.
+                let mainWindow: AXUIElement? = attribute(app, kAXMainWindowAttribute)
+                if let mainWindow, !elements.contains(where: { CFEqual($0, mainWindow) }) {
+                    elements.append(mainWindow)
+                }
                 let old = identities[pid] ?? []
                 // AXWindows is a snapshot, not a destruction signal. Some apps omit
                 // minimized/off-Space windows. Revalidate retained AX references.
@@ -180,7 +186,6 @@ final class AccessibilityService: @unchecked Sendable {
                 // Spaces. Operate on the exact menu element, never a title-guessed window.
                 let menuEntries = windowMenuEntries(app)
                 let descriptors = records.map(\.descriptor)
-                let mainWindow: AXUIElement? = attribute(app, kAXMainWindowAttribute)
                 let mainRecord = mainWindow.flatMap { main in records.first { !$0.menuOnly && CFEqual($0.element, main) } }
                 let knownWindowIDs = Set(records.map(\.id))
                 let oldAssociations = menuAssociations[pid] ?? []
@@ -194,8 +199,9 @@ final class AccessibilityService: @unchecked Sendable {
                     // then retain it across inactive/off-Space snapshots. Menu object,
                     // title and live window identity must all still agree.
                     let association: WindowMenuAssociation?
-                    if mark == "✓", let mainRecord {
-                        association = WindowMenuAssociation(title: title, windowID: mainRecord.id)
+                    if let confirmedID = WindowMenuAssociation.confirmedWindowID(selected: mark == "✓",
+                        menuWindowCount: menuEntries.count, windowIDs: records.map(\.id), mainWindowID: mainRecord?.id) {
+                        association = WindowMenuAssociation(title: title, windowID: confirmedID)
                     } else {
                         association = oldAssociations.first {
                             CFEqual($0.0, entry) && $0.1.represents(title: title, knownWindowIDs: knownWindowIDs)
