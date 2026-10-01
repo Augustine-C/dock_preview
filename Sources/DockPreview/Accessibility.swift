@@ -178,12 +178,18 @@ final class AccessibilityService: @unchecked Sendable {
                 // Window-menu entries remain exposed when AXWindows omits other
                 // Spaces. Operate on the exact menu element, never a title-guessed window.
                 let menuEntries = windowMenuEntries(app)
-                let titles = Dictionary(grouping: records, by: \.title)
+                let descriptors = records.map(\.descriptor)
+                let mainWindow: AXUIElement? = attribute(app, kAXMainWindowAttribute)
+                let mainWindowIsKnown = mainWindow.map { main in records.contains { !$0.menuOnly && CFEqual($0.element, main) } } ?? false
                 for entry in menuEntries {
-                    guard let title: String = attribute(entry, kAXTitleAttribute), !title.isEmpty,
-                          titles[title] == nil else { continue }
-                    let id = old.first { CFEqual($0.0, entry) }?.1 ?? UUID()
+                    guard let title: String = attribute(entry, kAXTitleAttribute), !title.isEmpty else { continue }
                     let mark: String = attribute(entry, kAXMenuItemMarkCharAttribute) ?? ""
+                    // AppKit marks the main window in its Window menu. Mail can
+                    // expose a different menu title, so use the exact AX main-window
+                    // object to establish that this entry is already represented.
+                    guard WindowMatcher.needsMenuFallback(title: title, windows: descriptors,
+                                                          selectedWindowIsKnown: mark == "✓" && mainWindowIsKnown) else { continue }
+                    let id = old.first { CFEqual($0.0, entry) }?.1 ?? UUID()
                     records.append(WindowRecord(id: id, pid: pid, element: entry, title: title,
                                                 frame: .zero, minimized: mark == "◆", canClose: false, menuOnly: true))
                     fresh.append((entry, id))
@@ -433,7 +439,9 @@ final class AccessibilityService: @unchecked Sendable {
                 let children: [AXUIElement] = attribute(app, kAXChildrenAttribute) ?? []
                 let childWindows = children.filter { (attribute($0, kAXRoleAttribute) as String?) == "AXWindow" }
                 func description(_ element: AXUIElement) -> [String: Any] {
-                    var result: [String: Any] = ["axHash": CFHash(element)]
+                    let title: String = attribute(element, kAXTitleAttribute) ?? ""
+                    var result: [String: Any] = ["axHash": CFHash(element),
+                        "titleFormatChanged": WindowMatcher.normalizedTitle(title) != title, "titleEmpty": title.isEmpty]
                     for name in [kAXRoleAttribute, kAXSubroleAttribute, kAXMinimizedAttribute] {
                         var value: CFTypeRef?
                         let error = AXUIElementCopyAttributeValue(element, name as CFString, &value)
@@ -456,10 +464,18 @@ final class AccessibilityService: @unchecked Sendable {
                             for entry in entries {
                                 let identifier: String = attribute(entry, kAXIdentifierAttribute) ?? ""
                                 if identifier == "makeKeyAndOrderFront:" {
+                                    let title: String = attribute(entry, kAXTitleAttribute) ?? ""
+                                    let normalizedMatches = windows.indices.filter {
+                                        WindowMatcher.normalizedTitle(attribute(windows[$0], kAXTitleAttribute) as String? ?? "") == WindowMatcher.normalizedTitle(title)
+                                    }
+                                    let rawMatches = windows.indices.filter {
+                                        (attribute(windows[$0], kAXTitleAttribute) as String?) == title
+                                    }
                                     let linked: [AXUIElement] = attribute(entry, kAXLinkedUIElementsAttribute) ?? []
                                     menuWindows.append(["axHash": CFHash(entry), "identifier": identifier,
                                                         "mark": attribute(entry, kAXMenuItemMarkCharAttribute) as String? ?? "",
-                                                        "linked": linked.map(description)])
+                                                        "linked": linked.map(description),
+                                                        "rawWindowMatches": rawMatches, "normalizedWindowMatches": normalizedMatches])
                                 }
                             }
                         }
@@ -471,7 +487,8 @@ final class AccessibilityService: @unchecked Sendable {
                     "reportedCount": count, "arrayError": arrayError.rawValue,
                     "windows": windows.map(description), "arrayWindows": arrayWindows.map(description),
                     "childWindows": childWindows.map(description), "retainedWindows": retained,
-                    "windowMenuItems": menuWindows])
+                    "windowMenuItems": menuWindows,
+                    "mainWindow": (attribute(app, kAXMainWindowAttribute) as AXUIElement?).map(description) ?? [:]])
             }
         }
     }

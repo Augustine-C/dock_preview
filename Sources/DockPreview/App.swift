@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 var report = await service.rawWindowReport(pid: target.processIdentifier)
                 let records = await service.windows(pid: target.processIdentifier)
                 report["includedWindows"] = records.map {
-                    ["axHash": CFHash($0.element), "minimized": $0.minimized,
+                    ["axHash": CFHash($0.element), "minimized": $0.minimized, "menuOnly": $0.menuOnly,
                      "frame": [$0.frame.minX, $0.frame.minY, $0.frame.width, $0.frame.height]] as [String: Any]
                 }
                 if CommandLine.arguments.contains("--capture-check") {

@@ -134,6 +134,26 @@ final class PreviewCoreTests: XCTestCase {
         XCTAssertNil(WindowMatcher.mutuallyUniqueTitleMatch(at: 0, windows: [menu], candidates: [.init(pid: 43, title: "Project", frame: shot.frame)]))
         XCTAssertNil(WindowMatcher.mutuallyUniqueTitleMatch(at: 0, windows: [.init(pid: 42, title: "", frame: .zero)], candidates: [.init(pid: 42, title: "", frame: shot.frame)]))
     }
+    func testMenuFallbackDoesNotDuplicateFormattedAXTitle() {
+        let window = WindowDescriptor(pid: 42, title: "Inbox", frame: .zero)
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "\u{2068}Inbox\u{2069}", windows: [window]))
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "  Inbox\n", windows: [window]))
+        let formatted = WindowDescriptor(pid: 42, title: "\u{2066}Inbox\u{2069}", frame: .zero)
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [formatted]))
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [window, window]))
+    }
+    func testMenuFallbackPreservesMissingWindowsAndRejectsEmptyTitles() {
+        let window = WindowDescriptor(pid: 42, title: "Inbox", frame: .zero)
+        XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Draft", windows: [window]))
+        XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Inbox", windows: []))
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: " \u{2068}\u{2069}\n", windows: []))
+    }
+    func testSelectedMenuWindowDoesNotDuplicateKnownMainWindowWithDifferentTitle() {
+        let main = WindowDescriptor(pid: 42, title: "Inbox — Account", frame: .zero)
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [main], selectedWindowIsKnown: true))
+        XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [main], selectedWindowIsKnown: false))
+        XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Inbox", windows: []))
+    }
     func testMenuTitleFormattingDoesNotChangeIdentity() {
         let menu = WindowDescriptor(pid: 42, title: "\u{2068}Project\u{2069}", frame: .zero)
         let shot = WindowDescriptor(pid: 42, title: "Project", frame: .zero)

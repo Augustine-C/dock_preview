@@ -45,10 +45,18 @@ public enum WindowMatcher {
         let matches = candidates.indices.filter { candidates[$0].pid == window.pid && normalizedTitle(candidates[$0].title) == title }
         return matches.count == 1 ? matches[0] : nil
     }
-    private static func normalizedTitle(_ title: String) -> String {
+    public static func normalizedTitle(_ title: String) -> String {
         // Bidirectional isolates are formatting, not window-title identity.
         String(title.unicodeScalars.filter { !(0x2066...0x2069).contains($0.value) })
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// A Window-menu entry supplements AX discovery only when its title is absent.
+    /// This does not merge real AX windows sharing a title or choose an action target.
+    public static func needsMenuFallback(title: String, windows: [WindowDescriptor], selectedWindowIsKnown: Bool = false) -> Bool {
+        guard !selectedWindowIsKnown else { return false }
+        let title = normalizedTitle(title)
+        return !title.isEmpty && !windows.contains { normalizedTitle($0.title) == title }
     }
 
     // Geometry breaks duplicate-title ties. An ambiguous match is deliberately omitted.
