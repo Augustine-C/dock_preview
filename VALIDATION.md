@@ -161,3 +161,16 @@ actionlint 与 diff 检查通过；官方 preview runner 标签尚未进入 acti
 首次 hosted run 36330020197：平台检查与核心测试成功，Release 编译成功；打包复制因新 SwiftPM 的二进制输出路径变化失败。构建脚本改用同配置的 `swift build --show-bin-path`，不再假定 `.build/arm64-apple-macosx/release`。设置显式导入 Combine，处理新工具链的传递导入警告。shell 语法与 diff 检查通过，修复通过推送后 hosted run 验证。
 
 修复后的 hosted run [36330153639](https://github.com/Augustine-C/dock_preview/actions/runs/36330153639) 在提交 `f9e432c` 上成功：核心测试、Release app、可视化 DMG、ZIP/校验文件及 artifact 上传全部通过，构建耗时 1m33s。普通 main 推送不运行标签发布 job；实际创建 GitHub Release 的路径尚未通过版本标签触发验证。
+
+
+## 2026-10-01：Mail 重复窗口卡片修正
+
+用户报告 Mail 实际只有一个窗口，却显示两张卡片，其中一张画面不可用；Safari 过去也出现过。安装版实机诊断在 Mail 激活后确认 AXWindows/直接子窗口只有同一个 AXStandardWindow，但窗口菜单项的标题不同于 AX 窗口标题，旧逻辑因此额外添加一条 menuOnly 记录。证据 `build/mail-active-before.json`；诊断不包含标题或图片。
+
+窗口菜单的当前窗口勾选标记（✓）与应用公开 AXMainWindow 对象关联：只有该精确对象已进入常规窗口记录时才省略对应菜单回退。其他菜单项继续回退；标题去重同时沿用截图匹配的方向隔离字符与首尾空白规范化。真实 AX 同名窗口仍分别保留，截图的双侧唯一性检查保持不变。诊断增加 menuOnly、主窗口、标题是否为空/带格式以及菜单标题匹配索引，不记录标题内容。
+
+自动验证：23 项 XCTest 通过（新增三个回归测试覆盖标题格式、缺失窗口及当前窗口菜单与主窗口标题不同），arm64 Release 构建、构建及安装副本签名校验、diff 检查通过。
+
+实机验证：`build/mail-main-fixed.json` 与更新后安装版 `build/mail-installed-fixed.json` 均为 trusted=true、reportedCount=1、includedWindows=1、menuOnly=false、imageAvailable=true。Safari 当前 `build/safari-fixed.json` 为一张 menuOnly 卡片且 imageAvailable=true，未复现历史重复问题，不能证明其历史原因。只正常激活 Mail 以取得 AX 数据，未关闭或修改用户应用窗口，图片仅在内存中捕获。已备份旧安装版到忽略的 build 目录，以正常 quit 流程退出旧 Dock Preview，更新 `/Applications/Dock Preview.app` 并启动。
+
+限制：此次未实际切换最小化、全屏状态或执行新的跨 Spaces 操作；相关逻辑有核心回归测试，但完整交互矩阵仍待验收。未改变系统权限、版本号或发布远程版本。
