@@ -174,3 +174,16 @@ actionlint 与 diff 检查通过；官方 preview runner 标签尚未进入 acti
 实机验证：`build/mail-main-fixed.json` 与更新后安装版 `build/mail-installed-fixed.json` 均为 trusted=true、reportedCount=1、includedWindows=1、menuOnly=false、imageAvailable=true。Safari 当前 `build/safari-fixed.json` 为一张 menuOnly 卡片且 imageAvailable=true，未复现历史重复问题，不能证明其历史原因。只正常激活 Mail 以取得 AX 数据，未关闭或修改用户应用窗口，图片仅在内存中捕获。已备份旧安装版到忽略的 build 目录，以正常 quit 流程退出旧 Dock Preview，更新 `/Applications/Dock Preview.app` 并启动。
 
 限制：此次未实际切换最小化、全屏状态或执行新的跨 Spaces 操作；相关逻辑有核心回归测试，但完整交互矩阵仍待验收。未改变系统权限、版本号或发布远程版本。
+
+
+## 2026-10-01：Mail 切换应用后重复卡片回归
+
+用户反馈上一版再次出现两张卡片。确认安装二进制与上一版构建完全一致，仅有一个正常运行实例。新增显式 `--window-cycle-check` 诊断在同一 AccessibilityService 内连续枚举：旧实现 Mail 激活时一张卡片，切回 Codex 后保留真实 AX 窗口，同时菜单勾选标记变为空串、菜单与 AX 标题仍不同，因而再添加 menuOnly 卡片。证据 `build/mail-cycle-before.json` 为 1→2，并包含一张失败、一张成功的截图状态；上一节单次前台检查未覆盖该状态变化。
+
+保留已由勾选项与精确 AXMainWindow 确认的关联，后续只在菜单 AX 元素、规范化标题、仍存在的窗口 UUID 全部一致时去重；标题变化/窗口身份消失使关联失效。暂时缺失菜单快照不清除有效关联。关联与 AX 状态同队列，沿用每 PID 最多 256、最多八个进程的缓存限制，不持久化。启动时枚举当前常规前台应用，并在应用激活通知时进行一次枚举，以便在第一次悬停前取得关联；不增加定时轮询或截图。
+
+自动验证：25 项 XCTest 通过，新增关联在选择标记消失后仍可识别、菜单条目改名或窗口销毁后不再去重的回归测试；arm64 Release、签名、diff 检查通过。
+
+实机状态变化验证：`build/mail-cycle-repeated-fixed.json` 连续三轮 Mail→Codex 切换的六次快照均只有一个真实 AX 窗口，最终 imageAvailable=true。最终安装版 `build/mail-installed-cycle-fixed.json` 再次完成相同三轮验证，trusted=true，六次均为一张卡片且最终预览可用。诊断正常激活应用并返回原前台应用，不关闭用户窗口、不持久化截图或标题。正常退出旧 Dock Preview、备份到忽略的 `build/Dock Preview-before-activation-fix.app`，安装并启动新构建；安装与构建二进制 SHA-256 一致。
+
+限制：这是同一服务跨状态的窗口枚举/截图实机验证，未自动操作 Dock 悬停面板；未改变最小化、全屏状态或权限，完整交互矩阵仍待验收。未重现 Safari 历史重复问题。本次修正覆盖已确认关联后的状态切换，不将无可确认关联时的菜单标题猜测用于去重。
