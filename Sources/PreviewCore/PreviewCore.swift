@@ -77,6 +77,20 @@ public enum WindowMatcher {
     }
 }
 
+/// A confirmed Window-menu entry remains associated with its AX window when
+/// the app becomes inactive and AppKit removes the menu's checkmark.
+public struct WindowMenuAssociation {
+    public let windowID: UUID
+    private let title: String
+    public init(title: String, windowID: UUID) {
+        self.title = WindowMatcher.normalizedTitle(title)
+        self.windowID = windowID
+    }
+    public func represents(title: String, knownWindowIDs: Set<UUID>) -> Bool {
+        self.title == WindowMatcher.normalizedTitle(title) && knownWindowIDs.contains(windowID)
+    }
+}
+
 public enum DockEdge: Sendable { case bottom, left, right }
 public enum PanelLayout {
     public static func columns(count: Int, screenWidth: CGFloat, cardWidth: CGFloat) -> Int {

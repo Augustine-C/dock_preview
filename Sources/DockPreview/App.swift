@@ -20,7 +20,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                     print("Target application not running: \(bundleID)"); NSApp.terminate(nil); return
                 }
                 let service = AccessibilityService()
+                var discoveryCycle: [[String: Any]] = []
+                if CommandLine.arguments.contains("--window-cycle-check"),
+                   let original = NSWorkspace.shared.frontmostApplication,
+                   original.processIdentifier != target.processIdentifier {
+                    func describe(_ records: [WindowRecord]) -> [[String: Any]] {
+                        records.map { ["axHash": CFHash($0.element), "menuOnly": $0.menuOnly] }
+                    }
+                    for cycle in 1...3 {
+                        NSApp.activate()
+                        NSApp.yieldActivation(to: target)
+                        _ = target.activate(from: .current, options: [])
+                        try? await Task.sleep(for: .milliseconds(800))
+                        discoveryCycle.append(["cycle": cycle, "phase": "targetActive", "targetIsActive": target.isActive,
+                                               "records": describe(await service.windows(pid: target.processIdentifier))])
+                        NSApp.activate()
+                        NSApp.yieldActivation(to: original)
+                        _ = original.activate(from: .current, options: [])
+                        try? await Task.sleep(for: .milliseconds(800))
+                        discoveryCycle.append(["cycle": cycle, "phase": "targetInactive", "targetIsActive": target.isActive,
+                                               "records": describe(await service.windows(pid: target.processIdentifier))])
+                    }
+                }
                 var report = await service.rawWindowReport(pid: target.processIdentifier)
+                if !discoveryCycle.isEmpty { report["discoveryCycle"] = discoveryCycle }
                 let records = await service.windows(pid: target.processIdentifier)
                 report["includedWindows"] = records.map {
                     ["axHash": CFHash($0.element), "minimized": $0.minimized, "menuOnly": $0.menuOnly,

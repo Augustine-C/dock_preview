@@ -44,6 +44,7 @@ final class AccessibilityService: @unchecked Sendable {
     private let queue = DispatchQueue(label: "local.DockPreview.accessibility", qos: .userInitiated)
     private var identities: [pid_t: [(AXUIElement, UUID)]] = [:]
     private var knownRecords: [pid_t: [WindowRecord]] = [:]
+    private var menuAssociations: [pid_t: [(AXUIElement, WindowMenuAssociation)]] = [:]
     private let logger = Logger(subsystem: "local.augustine.DockPreview", category: "interaction")
     private var lastDockLog: TimeInterval = 0
     private var lastDockFallback: TimeInterval = 0
@@ -180,15 +181,30 @@ final class AccessibilityService: @unchecked Sendable {
                 let menuEntries = windowMenuEntries(app)
                 let descriptors = records.map(\.descriptor)
                 let mainWindow: AXUIElement? = attribute(app, kAXMainWindowAttribute)
-                let mainWindowIsKnown = mainWindow.map { main in records.contains { !$0.menuOnly && CFEqual($0.element, main) } } ?? false
+                let mainRecord = mainWindow.flatMap { main in records.first { !$0.menuOnly && CFEqual($0.element, main) } }
+                let knownWindowIDs = Set(records.map(\.id))
+                let oldAssociations = menuAssociations[pid] ?? []
+                // A missing menu snapshot is not an identity change. Keep links
+                // for still-known windows until an entry is replaced or retitled.
+                var freshAssociations = oldAssociations.filter { knownWindowIDs.contains($0.1.windowID) }
                 for entry in menuEntries {
                     guard let title: String = attribute(entry, kAXTitleAttribute), !title.isEmpty else { continue }
                     let mark: String = attribute(entry, kAXMenuItemMarkCharAttribute) ?? ""
-                    // AppKit marks the main window in its Window menu. Mail can
-                    // expose a different menu title, so use the exact AX main-window
-                    // object to establish that this entry is already represented.
+                    // Confirm the association while AppKit marks its main window,
+                    // then retain it across inactive/off-Space snapshots. Menu object,
+                    // title and live window identity must all still agree.
+                    let association: WindowMenuAssociation?
+                    if mark == "✓", let mainRecord {
+                        association = WindowMenuAssociation(title: title, windowID: mainRecord.id)
+                    } else {
+                        association = oldAssociations.first {
+                            CFEqual($0.0, entry) && $0.1.represents(title: title, knownWindowIDs: knownWindowIDs)
+                        }?.1
+                    }
+                    freshAssociations.removeAll { CFEqual($0.0, entry) }
+                    if let association { freshAssociations.append((entry, association)) }
                     guard WindowMatcher.needsMenuFallback(title: title, windows: descriptors,
-                                                          selectedWindowIsKnown: mark == "✓" && mainWindowIsKnown) else { continue }
+                                                          selectedWindowIsKnown: association != nil) else { continue }
                     let id = old.first { CFEqual($0.0, entry) }?.1 ?? UUID()
                     records.append(WindowRecord(id: id, pid: pid, element: entry, title: title,
                                                 frame: .zero, minimized: mark == "◆", canClose: false, menuOnly: true))
@@ -212,10 +228,11 @@ final class AccessibilityService: @unchecked Sendable {
                                                     minimized: false, canClose: false, captureWindowID: windowID))
                     }
                 }
+                menuAssociations[pid] = Array(freshAssociations.prefix(256))
                 identities[pid] = Array(fresh.prefix(256))
                 knownRecords[pid] = Array(records.prefix(256))
                 if identities.count > 8 {
-                    identities.keys.filter { $0 != pid }.prefix(identities.count - 8).forEach { identities.removeValue(forKey: $0); knownRecords.removeValue(forKey: $0) }
+                    identities.keys.filter { $0 != pid }.prefix(identities.count - 8).forEach { identities.removeValue(forKey: $0); knownRecords.removeValue(forKey: $0); menuAssociations.removeValue(forKey: $0) }
                 }
                 continuation.resume(returning: Array(records.prefix(256)))
             }

@@ -54,6 +54,15 @@ final class PreviewCoordinator {
         if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
             self?.handle(event); return event
         }) { monitors.append(local) }
+        // Learn exact menu/main-window associations while AppKit still exposes
+        // the selection mark, even if the first Dock hover happens after switching.
+        prepareWindowDiscovery(for: NSWorkspace.shared.frontmostApplication)
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil, queue: .main) { [weak self] note in
+                Task { @MainActor in
+                    self?.prepareWindowDiscovery(for: note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)
+                }
+            })
         observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
             object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.hide() } })
         for name in [NSWorkspace.didTerminateApplicationNotification, NSWorkspace.activeSpaceDidChangeNotification,
@@ -69,6 +78,17 @@ final class PreviewCoordinator {
             })
         }
     }
+    private func prepareWindowDiscovery(for app: NSRunningApplication?) {
+        guard let app, app.activationPolicy == .regular,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              !settings.paused, !settings.excludes(app), AXIsProcessTrusted() else { return }
+        let pid = app.processIdentifier
+        Task { [weak self] in
+            guard let self else { return }
+            _ = await self.accessibility.windows(pid: pid)
+        }
+    }
+
     func stop() {
         hide(); monitors.forEach(NSEvent.removeMonitor); monitors.removeAll()
         observers.forEach { NotificationCenter.default.removeObserver($0); NSWorkspace.shared.notificationCenter.removeObserver($0) }

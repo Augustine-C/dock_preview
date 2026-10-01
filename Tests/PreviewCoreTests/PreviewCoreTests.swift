@@ -154,6 +154,23 @@ final class PreviewCoreTests: XCTestCase {
         XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [main], selectedWindowIsKnown: false))
         XCTAssertTrue(WindowMatcher.needsMenuFallback(title: "Inbox", windows: []))
     }
+    func testConfirmedMenuAssociationSurvivesLossOfSelectionMark() {
+        let windowID = UUID()
+        let association = WindowMenuAssociation(title: "Inbox", windowID: windowID)
+        let knownIDs: Set<UUID> = [windowID]
+        XCTAssertTrue(association.represents(title: "Inbox", knownWindowIDs: knownIDs))
+        let window = WindowDescriptor(pid: 42, title: "Inbox — Account", frame: .zero)
+        XCTAssertFalse(WindowMatcher.needsMenuFallback(title: "Inbox", windows: [window],
+            selectedWindowIsKnown: association.represents(title: "Inbox", knownWindowIDs: knownIDs)))
+        XCTAssertTrue(association.represents(title: "\u{2068}Inbox\u{2069}", knownWindowIDs: knownIDs))
+    }
+    func testMenuAssociationRejectsReusedEntryOrDestroyedWindow() {
+        let windowID = UUID()
+        let association = WindowMenuAssociation(title: "Inbox", windowID: windowID)
+        XCTAssertFalse(association.represents(title: "Draft", knownWindowIDs: [windowID]))
+        XCTAssertFalse(association.represents(title: "Inbox", knownWindowIDs: []))
+        XCTAssertFalse(association.represents(title: "Inbox", knownWindowIDs: [UUID()]))
+    }
     func testMenuTitleFormattingDoesNotChangeIdentity() {
         let menu = WindowDescriptor(pid: 42, title: "\u{2068}Project\u{2069}", frame: .zero)
         let shot = WindowDescriptor(pid: 42, title: "Project", frame: .zero)
