@@ -187,3 +187,16 @@ actionlint 与 diff 检查通过；官方 preview runner 标签尚未进入 acti
 实机状态变化验证：`build/mail-cycle-repeated-fixed.json` 连续三轮 Mail→Codex 切换的六次快照均只有一个真实 AX 窗口，最终 imageAvailable=true。最终安装版 `build/mail-installed-cycle-fixed.json` 再次完成相同三轮验证，trusted=true，六次均为一张卡片且最终预览可用。诊断正常激活应用并返回原前台应用，不关闭用户窗口、不持久化截图或标题。正常退出旧 Dock Preview、备份到忽略的 `build/Dock Preview-before-activation-fix.app`，安装并启动新构建；安装与构建二进制 SHA-256 一致。
 
 限制：这是同一服务跨状态的窗口枚举/截图实机验证，未自动操作 Dock 悬停面板；未改变最小化、全屏状态或权限，完整交互矩阵仍待验收。未重现 Safari 历史重复问题。本次修正覆盖已确认关联后的状态切换，不将无可确认关联时的菜单标题猜测用于去重。
+
+
+## 2026-10-01：Mail 未建立关联时的画面不可用
+
+用户反馈现在只有一张“画面不可用”卡片。前两次验证先激活 Mail 建立了关联，未覆盖服务刚启动、目标未激活的路径。旧安装版冷诊断 `build/mail-unavailable-current.json` 确认真正 AX 主窗口可截图，而标题不同的菜单回退无法匹配截图；此前 `build/mail-recurrence.json` 还显示 AXWindows 为空时 AXMainWindow 对象仍有效。
+
+发现过程现在将应用公开 AXMainWindow 精确对象加入候选，同样经过角色/子角色筛选，并以 CFEqual 去重。对“窗口菜单仅一项、真实窗口仅一个、且正是公开主窗口”的 AppKit 单窗口情形建立关联，不依赖勾选标记或标题相等。多窗口、未知主窗口仍拒绝这条单窗口规则；保留既有已确认关联和截图双侧唯一性检查。此规则依赖 AppKit 窗口菜单与唯一主窗口对应的单窗口情形，不用于推断多窗口操作对象。
+
+自动验证：27 项 XCTest、arm64 Release 构建、签名与 diff 检查通过。新增未激活单窗口关联，以及多个菜单/多个窗口/未知主窗口拒绝关联的回归测试。
+
+实机冷诊断：`build/mail-cold-fixed.json` 不带 --window-cycle-check，不主动激活 Mail、使用新 AccessibilityService，前台为 Parallels；窗口菜单无勾选标记且标题不匹配 AX 标题，仍只收集一个真实主窗口，imageAvailable=true。安装版 `build/mail-installed-cold-fixed.json` 重复同样检查成功、trusted=true。正常退出旧实例，备份到忽略的 build 目录，更新并启动安装版；未修改用户 Mail 窗口或权限。
+
+限制：未重新改变最小化/全屏状态，当前冷诊断的 AXWindows 恰好含主窗口，AXWindows 为空但主窗口有效的实机样本来自本次会话之前记录。此次验证不等同于实际 Dock 悬停验收，已请用户检查安装版的真实悬停结果。
